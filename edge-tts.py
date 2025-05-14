@@ -113,4 +113,4 @@ def index():
     return 'welcome to my tts!'
 
 if __name__ == "__main__":
-    app.run(port=2020,host="127.0.0.1",debug=True)
+    app.run(port=2020,host="0.0.0.0",debug=True)
