@@ -3,7 +3,7 @@ import os
 import re
 import sys
 
-from flask import Flask, request
+from flask import Flask, request, send_file
 from qcloud_cos import CosConfig, CosS3Client
 
 app = Flask(__name__)
@@ -67,7 +67,7 @@ def getVoiceById(voiceId):
 
 # 删除html标签
 def remove_html(string):
-    regex = re.compile(r'<[^>]+>')
+    regex = re.compile(r'<[^>]+>|\\n')
     return regex.sub('', string)
 
 
@@ -79,7 +79,8 @@ def createAudio(text, file_name, voiceId):
         return "error params"
 
     pwdPath = os.getcwd()
-    filePath = pwdPath + "/" + file_name
+    # filePath = pwdPath + "/" + file_name
+    filePath = f"{pwdPath}\output\{file_name}"
     dirPath = os.path.dirname(filePath)
     if not os.path.exists(dirPath):
         os.makedirs(dirPath)
@@ -91,7 +92,8 @@ def createAudio(text, file_name, voiceId):
     os.system(script)
     # 上传到腾讯云COS云存储
     # uploadCos(filePath, file_name)
-    return "success"
+    # return "success"
+    return send_file(filePath)
 
 
 def getParameter(paramName):
