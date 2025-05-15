@@ -3,7 +3,7 @@ import os
 import re
 import sys
 
-from flask import Flask, request
+from flask import Flask, request, send_file, jsonify
 from qcloud_cos import CosConfig, CosS3Client
 
 app = Flask(__name__)
@@ -66,20 +66,23 @@ def getVoiceById(voiceId):
 
 
 # 删除html标签
-def remove_html(string):
-    regex = re.compile(r'<[^>]+>')
+def clean_text(string):
+    # 去掉html标签和\n换行符
+    regex = re.compile(r'<[^>]+>|\n')
     return regex.sub('', string)
 
 
 def createAudio(text, file_name, voiceId):
-    new_text = remove_html(text)
+    new_text = clean_text(text)
     print(f"Text without html tags: {new_text}")
     voice = getVoiceById(voiceId)
     if not voice:
         return "error params"
 
     pwdPath = os.getcwd()
-    filePath = pwdPath + "/" + file_name
+    # filePath = pwdPath + "/output/" + user_code
+    uuid = os.urandom(16).hex()
+    filePath = f"{pwdPath}/output/{user_code}/{uuid}.mp3"
     dirPath = os.path.dirname(filePath)
     if not os.path.exists(dirPath):
         os.makedirs(dirPath)
@@ -88,10 +91,18 @@ def createAudio(text, file_name, voiceId):
         open(filePath, 'a').close()
 
     script = 'edge-tts --voice ' + voice + ' --text "' + new_text + '" --write-media ' + filePath
+    print(f"script: " + script)
     os.system(script)
     # 上传到腾讯云COS云存储
     # uploadCos(filePath, file_name)
-    return "success"
+    data = {
+        "code": 0,
+        "msg": "success",
+        "data": {
+            "url": f"{uuid}.mp3"
+        }
+    }
+    return jsonify(data)
 
 
 def getParameter(paramName):
@@ -101,14 +112,35 @@ def getParameter(paramName):
 
 @app.route('/dealAudio',methods=['POST','GET'])
 def dealAudio():
+    print("edge-tts.dealAudio()...")
+    print(f"request.args: {request.args}")
     text = getParameter('text')
-    file_name = getParameter('file_name')
+    user_code = getParameter('user_code')
     voice = getParameter('voice')
-    return createAudio(text, file_name, voice)
+    voice = voice if voice else "xiaoxiao"
+    return createAudio(text, user_code, voice)
+
+
+@app.route('/getAudio', methods=['POST', 'GET'])
+def getAudio():
+    #打印日志
+    print("edge-tts.getAudio()...")
+    print(f"request.args: {request.args}")
+    user_code = getParameter('user_code')
+    file_name = getParameter('file_name')
+    filePath = os.getcwd() + "/output/" + user_code + "/" + file_name
+    if not os.path.exists(filePath):
+        return jsonify({
+            "code": 1,
+            "msg": "file not found",
+            "data": {}
+        })
+    return send_file(filePath)
+    
 
 @app.route('/')
 def index():
     return 'welcome to my tts!'
 
 if __name__ == "__main__":
-    app.run(port=2020,host="127.0.0.1",debug=True)
+    app.run(port=2020,host="0.0.0.0",debug=True)
